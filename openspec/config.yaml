@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Go 1.26.4, gRPC, Docker, Python REPL (dill/pickle state).
+  Architecture: RLM core in Go; LMHandler via gRPC; container ↔ host proxy via gRPC;
+    Python REPL inside Docker with shared-volume context.txt and dill/pickle state.
+  Testing: go test (built-in), go test -cover, go vet, gofmt.
+  Style: Project-level samber/cc-skills-golang skills (code-style, error-handling,
+    concurrency, performance), prefer early returns, wrap errors with %w, structured
+    concurrency, unexported-by-default.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes.
+    - Document gRPC schema and Docker contract decisions.
+  specs:
+    - Use Given/When/Then for scenarios.
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).
+  design:
+    - Include sequence diagrams for gRPC and Docker flows.
+    - Document recursion (rlm_query) sibling-container strategy.
+  tasks:
+    - Group by phase (proto/core/handler/repl/docker).
+    - Keep tasks completable in one session.
+  apply:
+    tdd: true
+    test_command: "go test ./..."
+  verify:
+    test_command: "go test ./..."
+    build_command: "go build ./..."
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.
