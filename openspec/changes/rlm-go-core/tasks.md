@@ -9,11 +9,11 @@
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 proto/types → PR 2 client/prompt → PR 3 handler → PR 4 repl → PR 5 orchestrator → PR 6 api/cli |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Chain strategy | stacked-to-main |
 
-Decision needed before apply: Yes
+Decision needed before apply: No
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: stacked-to-main
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -29,12 +29,12 @@ Chain strategy: pending
 
 ## Phase 1: Foundation
 
-- [ ] 1.1 Update `go.mod` with gRPC, protobuf, and `x/sync` dependencies.
-- [ ] 1.2 Create `buf.yaml` and `buf.gen.yaml`.
-- [ ] 1.3 RED: Write table-driven tests for proto message construction.
-- [ ] 1.4 Create `proto/rlm/v1/types.proto`, `lm_service.proto`, and `rlm_service.proto`.
-- [ ] 1.5 GREEN: Generate `gen/rlm/v1/*.go` and make message tests pass.
-- [ ] 1.6 Create `internal/rlm/types.go` with `REPLResult`, `RLMChatCompletion`, and limit errors.
+- [x] 1.1 Update `go.mod` with gRPC, protobuf, and `x/sync` dependencies.
+- [x] 1.2 Create `buf.yaml` and `buf.gen.yaml`.
+- [x] 1.3 RED: Write table-driven tests for proto message construction.
+- [x] 1.4 Create `proto/rlm/v1/types.proto`, `lm_service.proto`, and `rlm_service.proto`.
+- [x] 1.5 GREEN: Generate `gen/rlm/v1/*.go` and make message tests pass.
+- [x] 1.6 Create `internal/rlm/types.go` with `REPLResult`, `RLMChatCompletion`, and limit errors.
 
 ## Phase 2: LM Client & Prompt Engine
 

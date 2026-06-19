@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package rlm.v1;
+
+option go_package = "rlm-golang/gen/rlm/v1;rlmv1";
+
+import "google/protobuf/duration.proto";
+import "rlm/v1/types.proto";
+
+// LMService serves plain LM completions from the host to the container.
+service LMService {
+  rpc Complete(CompleteRequest) returns (CompleteResponse);
+  rpc CompleteBatched(BatchedRequest) returns (BatchedResponse);
+  rpc GetUsage(GetUsageRequest) returns (GetUsageResponse);
+}
+
+message CompleteRequest {
+  string prompt = 1;
+  PromptType prompt_type = 2;
+  string model = 3;
+  int32 depth = 4;
+}
+
+message CompleteResponse {
+  string content = 1;
+  string root_model = 2;
+  ModelUsageSummary usage = 3;
+  google.protobuf.Duration execution_time = 4;
+  string error = 5;
+}
+
+message BatchedRequest {
+  repeated CompleteRequest items = 1;
+}
+
+message BatchedResponse {
+  repeated CompleteResponse responses = 1;
+}
+
+message GetUsageRequest {}
+
+message GetUsageResponse {
+  UsageSummary usage = 1;
+}

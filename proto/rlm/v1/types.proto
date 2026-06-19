@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package rlm.v1;
+
+option go_package = "rlm-golang/gen/rlm/v1;rlmv1";
+
+import "google/protobuf/duration.proto";
+
+// PromptType discriminates between a raw string prompt and a JSON-encoded
+// payload (string, object, or list).
+enum PromptType {
+  PROMPT_RAW = 0;
+  PROMPT_JSON = 1;
+}
+
+// ModelUsageSummary aggregates usage counters for a single model.
+message ModelUsageSummary {
+  int32 total_calls = 1;
+  int32 total_input_tokens = 2;
+  int32 total_output_tokens = 3;
+  optional double total_cost = 4;
+}
+
+// UsageSummary aggregates per-model usage across the whole session.
+message UsageSummary {
+  map<string, ModelUsageSummary> model_usage_summaries = 1;
+}
+
+// RLMChatCompletion records a single LLM call made from within the REPL.
+message RLMChatCompletion {
+  string root_model = 1;
+  string prompt = 2;
+  PromptType prompt_type = 3;
+  string response = 4;
+  UsageSummary usage_summary = 5;
+  google.protobuf.Duration execution_time = 6;
+  string error = 7;
+}

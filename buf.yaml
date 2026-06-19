@@ -1,0 +1,11 @@
+version: v1
+name: buf.build/rlm/rlm-go-core
+build:
+  roots:
+    - proto
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - DEFAULT

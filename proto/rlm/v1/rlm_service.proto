@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package rlm.v1;
+
+option go_package = "rlm-golang/gen/rlm/v1;rlmv1";
+
+import "google/protobuf/duration.proto";
+import "rlm/v1/types.proto";
+
+// RLMService serves recursive child RLM calls from the container to the host.
+service RLMService {
+  rpc Subcall(SubcallRequest) returns (SubcallResponse);
+  rpc SubcallBatched(BatchedSubcallRequest) returns (BatchedSubcallResponse);
+}
+
+message SubcallRequest {
+  string prompt = 1;
+  PromptType prompt_type = 2;
+  string model = 3;
+  int32 depth = 4;
+}
+
+message SubcallResponse {
+  string content = 1;
+  string root_model = 2;
+  ModelUsageSummary usage = 3;
+  google.protobuf.Duration execution_time = 4;
+  string error = 5;
+}
+
+message BatchedSubcallRequest {
+  repeated SubcallRequest items = 1;
+}
+
+message BatchedSubcallResponse {
+  repeated SubcallResponse responses = 1;
+}
