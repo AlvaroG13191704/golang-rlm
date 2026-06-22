@@ -38,44 +38,44 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: LM Client & Prompt Engine
 
-- [ ] 2.1 RED: Write `httptest` table for Ollama generate/chat/errors.
-- [ ] 2.2 Create `internal/client/base.go` and `internal/client/ollama.go`.
-- [ ] 2.3 GREEN: Make Ollama tests pass, including usage/duration/zero-division guards.
-- [ ] 2.4 RED: Write `QueryMetadata` and prompt-builder tests.
-- [ ] 2.5 Create `internal/prompt/prompts.go`.
-- [ ] 2.6 GREEN: Make prompt tests pass.
+- [x] 2.1 RED: Write `httptest` table for Ollama generate/chat/errors.
+- [x] 2.2 Create `internal/client/base.go` and `internal/client/ollama.go`.
+- [x] 2.3 GREEN: Make Ollama tests pass, including usage/duration/zero-division guards.
+- [x] 2.4 RED: Write `QueryMetadata` and prompt-builder tests.
+- [x] 2.5 Create `internal/prompt/prompts.go`.
+- [x] 2.6 GREEN: Make prompt tests pass.
 
 ## Phase 3: LM Handler gRPC Server
 
-- [ ] 3.1 RED: Write `bufconn` tests for `LMService` routing and batched order.
-- [ ] 3.2 Create `internal/rlm/handler.go` with client registry and depth routing.
-- [ ] 3.3 GREEN: Make handler tests pass.
-- [ ] 3.4 RED: Write `bufconn` tests for `RLMService` subcall.
-- [ ] 3.5 Create `internal/server/server.go` wiring LM/RLM services.
-- [ ] 3.6 GREEN: Make subcall tests pass.
+- [x] 3.1 RED: Write `bufconn` tests for `LMService` routing and batched order.
+- [x] 3.2 Create `internal/rlm/handler.go` with client registry and depth routing.
+- [x] 3.3 GREEN: Make handler tests pass.
+- [x] 3.4 RED: Write `bufconn` tests for `RLMService` subcall.
+- [x] 3.5 Create `internal/server/server.go` wiring LM/RLM services.
+- [x] 3.6 GREEN: Make subcall tests pass.
 
 ## Phase 4: Docker REPL
 
-- [ ] 4.1 RED: Write exec-script template golden tests.
-- [ ] 4.2 Create `container/Dockerfile` and `internal/environment/execscript.go`.
-- [ ] 4.3 GREEN: Make template tests pass.
-- [ ] 4.4 Create `internal/environment/docker.go` with lifecycle and `docker exec` runner.
-- [ ] 4.5 RED: Write `DockerREPL` mock command-runner tests.
-- [ ] 4.6 GREEN: Make DockerREPL tests pass.
+- [x] 4.1 RED: Write exec-script template golden tests.
+- [x] 4.2 Create `container/Dockerfile` and `internal/environment/execscript.go`.
+- [x] 4.3 GREEN: Make template tests pass.
+- [x] 4.4 Create `internal/environment/docker.go` with lifecycle and `docker exec` runner.
+- [x] 4.5 RED: Write `DockerREPL` mock command-runner tests.
+- [x] 4.6 GREEN: Make DockerREPL tests pass.
 
 ## Phase 5: RLM Orchestrator
 
-- [ ] 5.1 RED: Write RLM limit-enforcement table tests with mock `Environment` and `BaseLM`.
-- [ ] 5.2 Create `internal/rlm/orchestrator.go` and `internal/rlm/iteration.go`.
-- [ ] 5.3 GREEN: Make orchestrator tests pass.
-- [ ] 5.4 RED: Write sibling-container recursion tests.
-- [ ] 5.5 GREEN: Implement `rlm_query` sibling-container spawn.
+- [x] 5.1 RED: Write RLM limit-enforcement table tests with mock `Environment` and `BaseLM`.
+- [x] 5.2 Create `internal/rlm/orchestrator.go` and `internal/rlm/iteration.go`.
+- [x] 5.3 GREEN: Make orchestrator tests pass.
+- [x] 5.4 RED: Write sibling-container recursion tests.
+- [x] 5.5 GREEN: Implement `rlm_query` sibling-container spawn.
 
 ## Phase 6: Public API, CLI & Verification
 
-- [ ] 6.1 Create `pkg/rlm/rlm.go` public wrapper.
-- [ ] 6.2 Create `cmd/rlm/main.go` CLI.
-- [ ] 6.3 RED: Write integration test for full `Completion` flow with mocks.
-- [ ] 6.4 GREEN: Make integration test pass.
-- [ ] 6.5 Run `go test -race ./...` and fix races.
-- [ ] 6.6 Run Docker E2E tests, skipped via `testing.Short()`.
+- [x] 6.1 Create `pkg/rlm/rlm.go` public wrapper.
+- [x] 6.2 Create `cmd/rlm/main.go` CLI.
+- [x] 6.3 RED: Write integration test for full `Completion` flow with mocks.
+- [x] 6.4 GREEN: Make integration test pass.
+- [x] 6.5 Run `go test -race ./...` and fix races.
+- [x] 6.6 Run Docker E2E tests, skipped via `testing.Short()`.

@@ -1,3 +1,6 @@
 # Local AI runtime state
 .atl/
 .agents
+.env
+context.txt
+*__pycache__
