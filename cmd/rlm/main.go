@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"rlm-golang/internal/logger"
@@ -90,11 +89,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 			return fmt.Errorf("stat context path: %w", err)
 		}
 		if info.IsDir() {
-			payload, err := readDirectoryContext(*contextFlag)
-			if err != nil {
-				return fmt.Errorf("read directory context: %w", err)
-			}
-			contextPayload = payload
+			contextPayload = rlm.DirectoryContext{Path: *contextFlag}
 		} else {
 			data, err := os.ReadFile(*contextFlag)
 			if err != nil {
@@ -148,28 +143,3 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	return nil
 }
 
-func readDirectoryContext(dirPath string) (map[string]any, error) {
-	result := make(map[string]any)
-	err := filepath.WalkDir(dirPath, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("read file %s: %w", path, err)
-		}
-		relPath, err := filepath.Rel(dirPath, path)
-		if err != nil {
-			return fmt.Errorf("rel path for %s: %w", path, err)
-		}
-		result[relPath] = string(data)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
-}

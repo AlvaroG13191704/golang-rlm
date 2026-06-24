@@ -175,6 +175,13 @@ func (r *DockerREPL) LoadContext(ctx context.Context, payload any) error {
 	}
 
 	switch v := payload.(type) {
+	case types.DirectoryContext:
+		slog.Debug("DockerREPL copying directory context", "container_id", r.containerID, "src", v.Path)
+		dst := filepath.Join(r.workspace, "context")
+		if err := copyDir(v.Path, dst); err != nil {
+			slog.Error("DockerREPL failed to copy directory context", "container_id", r.containerID, "error", err)
+			return fmt.Errorf("copy directory context: %w", err)
+		}
 	case string:
 		slog.Debug("DockerREPL loading string context", "container_id", r.containerID, "path", filepath.Join(r.workspace, "context.txt"), "size", len(v))
 		if err := os.WriteFile(filepath.Join(r.workspace, "context.txt"), []byte(v), 0o644); err != nil {
@@ -358,4 +365,25 @@ func (r *DockerREPL) Cleanup(ctx context.Context) error {
 		return errs[0]
 	}
 	return nil
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		targetPath := filepath.Join(dst, relPath)
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, 0o755)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(targetPath, data, 0o644)
+	})
 }

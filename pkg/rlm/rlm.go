@@ -26,6 +26,10 @@ type UsageSummary struct {
 	ModelUsageSummaries map[string]ModelUsageSummary
 }
 
+// DirectoryContext tells the orchestrator that the payload is a directory path
+// to be mounted or copied into the REPL workspace, rather than string content.
+type DirectoryContext = types.DirectoryContext
+
 // CompletionResult captures the result of a single RLM completion.
 type CompletionResult struct {
 	RootModel     string

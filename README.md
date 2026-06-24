@@ -8,7 +8,8 @@ Go port of the **Recursive Language Model (RLM)** inference runtime. A single `C
 
 - **Sandboxed Python REPL:** Runs code blocks (` ```repl `) securely inside a Docker container.
 - **Recursive Reasoning:** Allows the model to spawn child RLM runs (`rlm_query`) or plain LLM queries (`llm_query`) from inside the sandbox to delegate sub-tasks.
-- **Rich Context Analytics:** Automatically detects and loads `.csv`, `.tsv`, or semicolon-separated files as a `pandas.DataFrame` (`df`) inside the REPL, enabling high-performance analysis on large datasets.
+- **Rich Context Analytics:** Automatically detects and loads single `.csv`, `.tsv`, or semicolon-separated files as a `pandas.DataFrame` (`df`) inside the REPL, enabling high-performance analysis on large datasets.
+- **Directory Context Mounting:** You can mount entire directories into the sandbox. The LLM receives efficient file-previews (the first 100 characters of each file) in its prompt to locate what it needs without token saturation, allowing it to read raw files natively.
 - **Structured Logging:** Includes clean structured logging with ANSI colors and automatic truncation of large prompt payloads to prevent terminal saturation.
 
 ## Requirements
@@ -47,18 +48,18 @@ Pipe a prompt from stdin:
 echo "Explain recursion in three sentences." | go run ./cmd/rlm --model llama3.1
 ```
 
-### Loading Context Files
+### Loading Context
 
-You can pass a `.txt`, `.md`, or `.csv` context file using the `--context` flag:
+You can pass a single file (`.txt`, `.md`, `.csv`) OR an entire directory using the `--context` flag:
 
 ```bash
 go run ./cmd/rlm \
   --model gemma4:31b-cloud \
-  --context dataset/fifa_world_cup_2026_player_performance.csv \
-  --prompt "Load the dataset and calculate the average player age."
+  --context my-datasets/ \
+  --prompt "Load the fifa dataset and calculate the average player age."
 ```
 
-*Note: If a CSV file is supplied, it is pre-loaded into the Python environment as a pandas DataFrame named `df`.*
+*Note: If a single CSV file is supplied, it is pre-loaded into the Python environment as a pandas DataFrame named `df`. If a directory is supplied, its contents are mounted into the sandbox at `/workspace/context/` and the LLM receives file-previews to efficiently locate what it needs to read natively via `open()` or `pd.read_csv()`.*
 
 ### CLI Flags
 
@@ -66,7 +67,7 @@ go run ./cmd/rlm \
 |---|---|---|
 | `--model` | `nemotron-3-ultra:cloud` | LLM model name |
 | `--prompt` | `""` | Prompt text (alternative: pipe to stdin) |
-| `--context` | `""` | Path to a file containing context (.txt, .md, or .csv) |
+| `--context` | `""` | Path to a file or directory containing context |
 | `--max-iterations` | `30` | Maximum REPL iterations allowed |
 | `--max-depth` | `2` | Maximum recursion depth |
 | `--ollama-host` | `""` | Ollama base URL |

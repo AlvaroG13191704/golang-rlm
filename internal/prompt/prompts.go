@@ -5,9 +5,13 @@ package prompt
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
+
+	"rlm-golang/internal/types"
 )
 
 // Message is a single chat message with a role and content.
@@ -22,6 +26,7 @@ type QueryMetadata struct {
 	ContextTotalLength int
 	ContextType        string
 	Keys               []string
+	Previews           []string
 }
 
 // RLM_SYSTEM_PROMPT is the default system prompt for the RLM. It mirrors the
@@ -69,6 +74,43 @@ func NewQueryMetadata(prompt any) (QueryMetadata, error) {
 	var meta QueryMetadata
 
 	switch p := prompt.(type) {
+	case types.DirectoryContext:
+		meta.ContextType = "directory"
+		err := filepath.WalkDir(p.Path, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			relPath, err := filepath.Rel(p.Path, path)
+			if err != nil {
+				return err
+			}
+			meta.Keys = append(meta.Keys, relPath)
+			meta.ContextLengths = append(meta.ContextLengths, int(info.Size()))
+
+			data, err := os.ReadFile(path)
+			var preview string
+			if err == nil {
+				preview = string(data)
+				if len(preview) > 100 {
+					preview = preview[:100] + "..."
+				}
+				preview = strings.ReplaceAll(preview, "\n", " ")
+				preview = strings.ReplaceAll(preview, "\r", " ")
+			}
+			meta.Previews = append(meta.Previews, preview)
+
+			return nil
+		})
+		if err != nil {
+			return meta, fmt.Errorf("read directory context metadata: %w", err)
+		}
 	case string:
 		meta.ContextType = "str"
 		meta.ContextLengths = []int{len(p)}
@@ -82,6 +124,14 @@ func NewQueryMetadata(prompt any) (QueryMetadata, error) {
 		meta.Keys = keys
 		for _, k := range keys {
 			meta.ContextLengths = append(meta.ContextLengths, lengthOf(p[k]))
+
+			preview := toString(p[k])
+			if len(preview) > 100 {
+				preview = preview[:100] + "..."
+			}
+			preview = strings.ReplaceAll(preview, "\n", " ")
+			preview = strings.ReplaceAll(preview, "\r", " ")
+			meta.Previews = append(meta.Previews, preview)
 		}
 	case []any:
 		meta.ContextType = "list"
@@ -125,12 +175,32 @@ func BuildSystemPrompt(systemPrompt string, meta QueryMetadata, customTools map[
 		finalSystemPrompt = finalSystemPrompt + "\n\n" + ORCHESTRATOR_ADDENDUM
 	}
 
-	metadataBody := fmt.Sprintf(
-		"Your context is a %s of %d total characters. Each sub-LLM call can handle roughly ~100k tokens at once.",
-		meta.ContextType, meta.ContextTotalLength,
-	)
+	var metadataBody string
+	if meta.ContextType == "directory" {
+		metadataBody = fmt.Sprintf(
+			"Your context is mounted as a directory at '/workspace/context/' containing %d total bytes. Each sub-LLM call can handle roughly ~100k tokens at once.",
+			meta.ContextTotalLength,
+		)
+	} else {
+		metadataBody = fmt.Sprintf(
+			"Your context is a %s of %d total characters. Each sub-LLM call can handle roughly ~100k tokens at once.",
+			meta.ContextType, meta.ContextTotalLength,
+		)
+	}
 	if len(meta.Keys) > 0 {
-		metadataBody += fmt.Sprintf("\nAvailable context keys (files): %s", strings.Join(meta.Keys, ", "))
+		var fileList []string
+		for i, key := range meta.Keys {
+			if len(meta.Previews) > i && meta.Previews[i] != "" {
+				fileList = append(fileList, fmt.Sprintf("- %s (preview: %q)", key, meta.Previews[i]))
+			} else {
+				fileList = append(fileList, fmt.Sprintf("- %s", key))
+			}
+		}
+		if meta.ContextType == "directory" {
+			metadataBody += fmt.Sprintf("\nAvailable files mounted at /workspace/context/:\n%s", strings.Join(fileList, "\n"))
+		} else {
+			metadataBody += fmt.Sprintf("\nAvailable context keys:\n%s", strings.Join(fileList, "\n"))
+		}
 	}
 	var metadataPrompt string
 	if rootPrompt != "" {

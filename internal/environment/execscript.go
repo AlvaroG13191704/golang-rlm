@@ -229,6 +229,9 @@ elif os.path.exists("/workspace/context.json"):
     logger.info("loading JSON context from /workspace/context.json")
     with open("/workspace/context.json", "r") as f:
         _locals["context"] = json.load(f)
+elif os.path.exists("/workspace/context") and os.path.isdir("/workspace/context"):
+    logger.info("loading directory context metadata")
+    _locals["context"] = "Context is mounted as a directory at '/workspace/context/'. Use Python open() or pandas to read the files you need."
 
 if os.path.exists("/workspace/context.csv"):
     logger.info("loading CSV context from /workspace/context.csv")

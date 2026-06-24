@@ -1,13 +1,30 @@
 package prompt_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"rlm-golang/internal/prompt"
+	"rlm-golang/internal/types"
 )
 
 func TestNewQueryMetadata(t *testing.T) {
+	tempDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(tempDir, "file1.txt"), []byte("123"), 0644)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	err = os.Mkdir(filepath.Join(tempDir, "sub"), 0755)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	err = os.WriteFile(filepath.Join(tempDir, "sub", "file2.txt"), []byte("1234"), 0644)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+
 	tests := []struct {
 		name        string
 		prompt      any
@@ -17,6 +34,14 @@ func TestNewQueryMetadata(t *testing.T) {
 		wantKeys    []string
 		wantErr     bool
 	}{
+		{
+			name:        "directory",
+			prompt:      types.DirectoryContext{Path: tempDir},
+			wantType:    "directory",
+			wantLengths: []int{3, 4},
+			wantTotal:   7,
+			wantKeys:    []string{"file1.txt", filepath.Join("sub", "file2.txt")},
+		},
 		{
 			name:        "string",
 			prompt:      "hello",
@@ -158,7 +183,7 @@ func TestBuildSystemPrompt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("BuildSystemPrompt: %v", err)
 		}
-		wantContains := "Available context keys (files): file1.txt, file2.txt"
+		wantContains := "Available context keys:\n- file1.txt (preview: \"foo\")\n- file2.txt (preview: \"bar\")"
 		if !strings.Contains(msgs[1].Content, wantContains) {
 			t.Errorf("user content = %q, want it to contain %q", msgs[1].Content, wantContains)
 		}

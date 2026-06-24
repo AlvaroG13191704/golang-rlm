@@ -22,6 +22,12 @@ type UsageSummary struct {
 	ModelUsageSummaries map[string]ModelUsageSummary
 }
 
+// DirectoryContext tells the orchestrator that the payload is a directory path
+// to be mounted or copied into the REPL workspace, rather than string content.
+type DirectoryContext struct {
+	Path string
+}
+
 // TotalCost returns the aggregate cost across all models, or nil if no model
 // reports cost.
 func (u UsageSummary) TotalCost() *float64 {
