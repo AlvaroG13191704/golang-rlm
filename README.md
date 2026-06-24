@@ -2,6 +2,8 @@
 
 Go port of the **Recursive Language Model (RLM)** inference runtime. A single `Completion()` call spawns a Docker-based Python REPL sandbox, executes an iterative LLM-driven loop, runs Python code dynamically to explore contexts, and returns the final answer produced by the model.
 
+> **Credits / Acknowledgments:** This project is a Go-based implementation inspired by and based on the original [RLM paper and repository](https://github.com/alexzhang13/rlm). All core conceptual credits belong to the original authors.
+
 ## Features
 
 - **Sandboxed Python REPL:** Runs code blocks (` ```repl `) securely inside a Docker container.
