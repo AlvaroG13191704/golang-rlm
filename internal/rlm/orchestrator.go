@@ -52,10 +52,12 @@ type RLM struct {
 
 // NewRLM returns an RLM with safe defaults.
 func NewRLM() *RLM {
+	maxErrorsDefault := 3
 	return &RLM{
 		MaxDepth:              defaultMaxDepth,
 		MaxIterations:         defaultMaxIterations,
 		MaxConcurrentSubcalls: defaultMaxConcurrentSubcalls,
+		MaxErrors:             &maxErrorsDefault,
 	}
 }
 
@@ -112,13 +114,23 @@ func (r *RLM) Completion(ctx context.Context, promptPayload any, rootPrompt stri
 		return nil, fmt.Errorf("load context: %w", err)
 	}
 
-	messageHistory, err := r.buildInitialMessages(promptPayload, rootPrompt)
+	meta, err := prompt.NewQueryMetadata(promptPayload)
+	if err != nil {
+		return nil, fmt.Errorf("query metadata: %w", err)
+	}
+
+	messageHistory, err := r.buildInitialMessages(meta, rootPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("build initial messages: %w", err)
 	}
 
 	start := time.Now()
 	r.setStartTime(start)
+
+	contextCount := 1
+	if meta.ContextType == "list" || meta.ContextType == "dict" {
+		contextCount = len(meta.ContextLengths)
+	}
 
 	for i := 0; i < r.MaxIterations; i++ {
 		slog.Info("RLM iteration", "iteration", i+1, "max_iterations", r.MaxIterations, "depth", r.Depth)
@@ -128,7 +140,7 @@ func (r *RLM) Completion(ctx context.Context, promptPayload any, rootPrompt stri
 			return nil, err
 		}
 
-		messageHistory = append(messageHistory, prompt.BuildUserPrompt(rootPrompt, i, 1, 0, r.MaxIterations))
+		messageHistory = append(messageHistory, prompt.BuildUserPrompt(rootPrompt, i, contextCount, 0, r.MaxIterations))
 
 		iter, err := r.completionTurn(ctx, messageHistory, defaultClient, env)
 		if err != nil {
@@ -333,11 +345,7 @@ func (r *RLM) startServices(lmHandler *LMHandler) (string, int, func(), error) {
 	}, nil
 }
 
-func (r *RLM) buildInitialMessages(promptPayload any, rootPrompt string) ([]prompt.Message, error) {
-	meta, err := prompt.NewQueryMetadata(promptPayload)
-	if err != nil {
-		return nil, fmt.Errorf("query metadata: %w", err)
-	}
+func (r *RLM) buildInitialMessages(meta prompt.QueryMetadata, rootPrompt string) ([]prompt.Message, error) {
 	return prompt.BuildSystemPrompt(prompt.RLM_SYSTEM_PROMPT, meta, nil, rootPrompt, true)
 }
 

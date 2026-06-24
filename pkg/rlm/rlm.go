@@ -67,12 +67,15 @@ type config struct {
 //   - max-depth: 2
 //   - max-iterations: 30
 //   - max-concurrent-subcalls: 4
+//   - max-errors: 3
 func New(opts ...Option) (*RLM, error) {
+	maxErrorsDefault := 3
 	cfg := &config{
 		backend:               "ollama",
 		maxDepth:              2,
 		maxIterations:         30,
 		maxConcurrentSubcalls: 4,
+		maxErrors:             &maxErrorsDefault,
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -132,7 +135,7 @@ func (r *RLM) Completion(ctx context.Context, prompt string) (*CompletionResult,
 
 // CompletionWithContext runs the iterative RLM loop using the provided context
 // as the REPL payload and the prompt as the root question.
-func (r *RLM) CompletionWithContext(ctx context.Context, prompt string, context string) (*CompletionResult, error) {
+func (r *RLM) CompletionWithContext(ctx context.Context, prompt string, context any) (*CompletionResult, error) {
 	res, err := r.internal.Completion(ctx, context, prompt)
 	if err != nil {
 		return nil, err
@@ -232,8 +235,13 @@ func WithMaxTokens(n int) Option {
 }
 
 // WithMaxErrors sets the maximum consecutive errors before aborting.
+// Pass a value <= 0 to disable error-based aborting.
 func WithMaxErrors(n int) Option {
 	return func(cfg *config) {
-		cfg.maxErrors = &n
+		if n <= 0 {
+			cfg.maxErrors = nil
+		} else {
+			cfg.maxErrors = &n
+		}
 	}
 }

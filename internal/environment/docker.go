@@ -290,7 +290,7 @@ func (r *DockerREPL) parseExecOutput(stdout, stderr []byte, elapsed time.Duratio
 
 	return rlm.REPLResult{
 		Stdout:        raw.Stdout,
-		Stderr:        raw.Stderr + string(stderr),
+		Stderr:        raw.Stderr,
 		Locals:        raw.Locals,
 		FinalAnswer:   raw.FinalAnswer,
 		ExecutionTime: elapsed,

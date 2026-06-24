@@ -14,6 +14,7 @@ func TestNewQueryMetadata(t *testing.T) {
 		wantType    string
 		wantLengths []int
 		wantTotal   int
+		wantKeys    []string
 		wantErr     bool
 	}{
 		{
@@ -29,6 +30,7 @@ func TestNewQueryMetadata(t *testing.T) {
 			wantType:    "dict",
 			wantLengths: []int{3, 3},
 			wantTotal:   6,
+			wantKeys:    []string{"a", "b"},
 		},
 		{
 			name:        "list of strings",
@@ -57,6 +59,7 @@ func TestNewQueryMetadata(t *testing.T) {
 			wantType:    "dict",
 			wantLengths: []int{3},
 			wantTotal:   3,
+			wantKeys:    []string{"x"},
 		},
 		{
 			name:    "unsupported type",
@@ -90,6 +93,14 @@ func TestNewQueryMetadata(t *testing.T) {
 			}
 			if meta.ContextTotalLength != tt.wantTotal {
 				t.Errorf("ContextTotalLength = %d, want %d", meta.ContextTotalLength, tt.wantTotal)
+			}
+			if len(meta.Keys) != len(tt.wantKeys) {
+				t.Fatalf("Keys = %v, want %v", meta.Keys, tt.wantKeys)
+			}
+			for i := range tt.wantKeys {
+				if meta.Keys[i] != tt.wantKeys[i] {
+					t.Errorf("Keys[%d] = %q, want %q", i, meta.Keys[i], tt.wantKeys[i])
+				}
 			}
 		})
 	}
@@ -135,6 +146,21 @@ func TestBuildSystemPrompt(t *testing.T) {
 		wantPrefix := "Answer the following: summarize\n\nYour context is a str"
 		if !strings.HasPrefix(msgs[1].Content, wantPrefix) {
 			t.Errorf("user content = %q, want prefix %q", msgs[1].Content, wantPrefix)
+		}
+	})
+
+	t.Run("with dict context keys", func(t *testing.T) {
+		meta, err := prompt.NewQueryMetadata(map[string]any{"file1.txt": "foo", "file2.txt": "bar"})
+		if err != nil {
+			t.Fatalf("NewQueryMetadata: %v", err)
+		}
+		msgs, err := prompt.BuildSystemPrompt(prompt.RLM_SYSTEM_PROMPT, meta, nil, "", true)
+		if err != nil {
+			t.Fatalf("BuildSystemPrompt: %v", err)
+		}
+		wantContains := "Available context keys (files): file1.txt, file2.txt"
+		if !strings.Contains(msgs[1].Content, wantContains) {
+			t.Errorf("user content = %q, want it to contain %q", msgs[1].Content, wantContains)
 		}
 	})
 

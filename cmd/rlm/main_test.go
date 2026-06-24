@@ -14,14 +14,14 @@ import (
 // mockRLM is a test double returned by the CLI's rlm factory in tests.
 type mockRLM struct {
 	completionFunc            func(context.Context, string) (*rlm.CompletionResult, error)
-	completionWithContextFunc func(context.Context, string, string) (*rlm.CompletionResult, error)
+	completionWithContextFunc func(context.Context, string, any) (*rlm.CompletionResult, error)
 }
 
 func (m *mockRLM) Completion(ctx context.Context, prompt string) (*rlm.CompletionResult, error) {
 	return m.completionFunc(ctx, prompt)
 }
 
-func (m *mockRLM) CompletionWithContext(ctx context.Context, prompt string, context string) (*rlm.CompletionResult, error) {
+func (m *mockRLM) CompletionWithContext(ctx context.Context, prompt string, context any) (*rlm.CompletionResult, error) {
 	if m.completionWithContextFunc != nil {
 		return m.completionWithContextFunc(ctx, prompt, context)
 	}
@@ -63,13 +63,17 @@ func TestRunWithContextFlag(t *testing.T) {
 	var called bool
 	factory := func([]rlm.Option) (rlmInterface, error) {
 		return &mockRLM{
-			completionWithContextFunc: func(_ context.Context, prompt string, context string) (*rlm.CompletionResult, error) {
+			completionWithContextFunc: func(_ context.Context, prompt string, context any) (*rlm.CompletionResult, error) {
 				called = true
 				if prompt != "hello world" {
 					t.Errorf("prompt = %q, want %q", prompt, "hello world")
 				}
-				if context != "file context" {
-					t.Errorf("context = %q, want %q", context, "file context")
+				contextStr, ok := context.(string)
+				if !ok {
+					t.Errorf("expected context to be string, got %T", context)
+				}
+				if contextStr != "file context" {
+					t.Errorf("context = %q, want %q", contextStr, "file context")
 				}
 				return &rlm.CompletionResult{Response: "context result"}, nil
 			},
@@ -156,7 +160,9 @@ func TestRunWithModelFlag(t *testing.T) {
 }
 
 func TestRunWithLimits(t *testing.T) {
-	factory := func([]rlm.Option) (rlmInterface, error) {
+	var capturedOpts []rlm.Option
+	factory := func(opts []rlm.Option) (rlmInterface, error) {
+		capturedOpts = opts
 		return &mockRLM{completionFunc: func(_ context.Context, prompt string) (*rlm.CompletionResult, error) {
 			return &rlm.CompletionResult{Response: "limited"}, nil
 		}}, nil
@@ -167,12 +173,16 @@ func TestRunWithLimits(t *testing.T) {
 		"--prompt", "hi",
 		"--max-iterations", "5",
 		"--max-depth", "2",
+		"--max-errors", "4",
 	}, &bytes.Buffer{}, &stdout, &bytes.Buffer{}, factory)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "limited") {
 		t.Errorf("stdout = %q, want limited", stdout.String())
+	}
+	if len(capturedOpts) != 5 {
+		t.Errorf("len(capturedOpts) = %d, want 5", len(capturedOpts))
 	}
 }
 

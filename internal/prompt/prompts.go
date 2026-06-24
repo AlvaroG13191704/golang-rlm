@@ -21,6 +21,7 @@ type QueryMetadata struct {
 	ContextLengths     []int
 	ContextTotalLength int
 	ContextType        string
+	Keys               []string
 }
 
 // RLM_SYSTEM_PROMPT is the default system prompt for the RLM. It mirrors the
@@ -78,6 +79,7 @@ func NewQueryMetadata(prompt any) (QueryMetadata, error) {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
+		meta.Keys = keys
 		for _, k := range keys {
 			meta.ContextLengths = append(meta.ContextLengths, lengthOf(p[k]))
 		}
@@ -127,6 +129,9 @@ func BuildSystemPrompt(systemPrompt string, meta QueryMetadata, customTools map[
 		"Your context is a %s of %d total characters. Each sub-LLM call can handle roughly ~100k tokens at once.",
 		meta.ContextType, meta.ContextTotalLength,
 	)
+	if len(meta.Keys) > 0 {
+		metadataBody += fmt.Sprintf("\nAvailable context keys (files): %s", strings.Join(meta.Keys, ", "))
+	}
 	var metadataPrompt string
 	if rootPrompt != "" {
 		metadataPrompt = fmt.Sprintf("Answer the following: %s\n\n%s", rootPrompt, metadataBody)

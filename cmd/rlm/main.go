@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"rlm-golang/internal/logger"
@@ -18,7 +19,7 @@ import (
 // tests can inject a mock.
 type rlmInterface interface {
 	Completion(ctx context.Context, prompt string) (*rlm.CompletionResult, error)
-	CompletionWithContext(ctx context.Context, prompt string, context string) (*rlm.CompletionResult, error)
+	CompletionWithContext(ctx context.Context, prompt string, context any) (*rlm.CompletionResult, error)
 }
 
 func main() {
@@ -62,6 +63,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	contextFlag := fs.String("context", "", "Path to a file containing context text")
 	maxIterations := fs.Int("max-iterations", 30, "Maximum REPL iterations")
 	maxDepth := fs.Int("max-depth", 2, "Maximum recursion depth")
+	maxErrors := fs.Int("max-errors", 3, "Maximum consecutive execution errors before aborting (0 to disable)")
 	ollamaHost := fs.String("ollama-host", "", "Ollama host URL")
 
 	if err := fs.Parse(args); err != nil {
@@ -81,13 +83,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 		return errors.New("prompt is required (use --prompt or pipe to stdin)")
 	}
 
-	var contextStr string
+	var contextPayload any
 	if *contextFlag != "" {
-		data, err := os.ReadFile(*contextFlag)
+		info, err := os.Stat(*contextFlag)
 		if err != nil {
-			return fmt.Errorf("read context file: %w", err)
+			return fmt.Errorf("stat context path: %w", err)
 		}
-		contextStr = string(data)
+		if info.IsDir() {
+			payload, err := readDirectoryContext(*contextFlag)
+			if err != nil {
+				return fmt.Errorf("read directory context: %w", err)
+			}
+			contextPayload = payload
+		} else {
+			data, err := os.ReadFile(*contextFlag)
+			if err != nil {
+				return fmt.Errorf("read context file: %w", err)
+			}
+			contextPayload = string(data)
+		}
 	}
 
 	opts := []rlm.Option{
@@ -95,6 +109,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 		rlm.WithMaxIterations(*maxIterations),
 		rlm.WithMaxDepth(*maxDepth),
 		rlm.WithDockerREPL(),
+		rlm.WithMaxErrors(*maxErrors),
 	}
 	if *ollamaHost != "" {
 		opts = append(opts, rlm.WithOllamaHost(*ollamaHost))
@@ -106,8 +121,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	}
 
 	var result *rlm.CompletionResult
-	if contextStr != "" {
-		result, err = r.CompletionWithContext(context.Background(), prompt, contextStr)
+	if contextPayload != nil {
+		result, err = r.CompletionWithContext(context.Background(), prompt, contextPayload)
 	} else {
 		result, err = r.Completion(context.Background(), prompt)
 	}
@@ -131,4 +146,30 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	fmt.Fprintf(stdout, "  Total Output Tokens: %d\n", totalOutput)
 	fmt.Fprintf(stdout, "  Total Tokens:        %d\n", totalInput+totalOutput)
 	return nil
+}
+
+func readDirectoryContext(dirPath string) (map[string]any, error) {
+	result := make(map[string]any)
+	err := filepath.WalkDir(dirPath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read file %s: %w", path, err)
+		}
+		relPath, err := filepath.Rel(dirPath, path)
+		if err != nil {
+			return fmt.Errorf("rel path for %s: %w", path, err)
+		}
+		result[relPath] = string(data)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

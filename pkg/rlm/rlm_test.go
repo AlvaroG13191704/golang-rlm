@@ -73,6 +73,21 @@ func TestCompletionWithContext(t *testing.T) {
 	}
 }
 
+func TestCompletionWithMapContext(t *testing.T) {
+	r, err := rlm.New(rlm.WithModel("test"))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctxPayload := map[string]any{"file1.txt": "content1", "file2.txt": "content2"}
+	_, err = r.CompletionWithContext(context.Background(), "prompt", ctxPayload)
+	if err == nil {
+		t.Fatal("expected error without environment")
+	}
+	if !strings.Contains(err.Error(), "environment") {
+		t.Errorf("error = %v, want environment-related error", err)
+	}
+}
+
 func TestWithLimitsAccepted(t *testing.T) {
 	r, err := rlm.New(
 		rlm.WithModel("test"),
