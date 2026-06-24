@@ -1,16 +1,23 @@
 # rlm-golang
 
-Go port of the Recursive Language Model (RLM) inference runtime. A single
-`Completion()` call spawns a Docker-based Python REPL, runs an iterative LLM
-loop, and returns the final answer produced by the model inside the REPL.
+Go port of the **Recursive Language Model (RLM)** inference runtime. A single `Completion()` call spawns a Docker-based Python REPL sandbox, executes an iterative LLM-driven loop, runs Python code dynamically to explore contexts, and returns the final answer produced by the model.
+
+## Features
+
+- **Sandboxed Python REPL:** Runs code blocks (` ```repl `) securely inside a Docker container.
+- **Recursive Reasoning:** Allows the model to spawn child RLM runs (`rlm_query`) or plain LLM queries (`llm_query`) from inside the sandbox to delegate sub-tasks.
+- **Rich Context Analytics:** Automatically detects and loads `.csv`, `.tsv`, or semicolon-separated files as a `pandas.DataFrame` (`df`) inside the REPL, enabling high-performance analysis on large datasets.
+- **Structured Logging:** Includes clean structured logging with ANSI colors and automatic truncation of large prompt payloads to prevent terminal saturation.
 
 ## Requirements
 
-- Go 1.26.4+
-- Docker Engine
-- Ollama running locally (default) or accessible via `--ollama-host`
+- **Go 1.26.4+**
+- **Docker Engine**
+- **Ollama** (running locally or accessible via URL)
 
 ## Installation
+
+Clone the repository and build the CLI binary:
 
 ```bash
 git clone https://github.com/AlvaroG13191704/golang-rlm.git
@@ -18,7 +25,55 @@ cd golang-rlm
 go build ./...
 ```
 
-## Library usage
+Build the sandbox Docker image once before running:
+
+```bash
+docker build -t rlm-sandbox -f container/Dockerfile .
+```
+
+## CLI Usage
+
+Run a completion with a prompt:
+
+```bash
+go run ./cmd/rlm --model llama3.1 --prompt "What is 2 + 2?"
+```
+
+Pipe a prompt from stdin:
+
+```bash
+echo "Explain recursion in three sentences." | go run ./cmd/rlm --model llama3.1
+```
+
+### Loading Context Files
+
+You can pass a `.txt`, `.md`, or `.csv` context file using the `--context` flag:
+
+```bash
+go run ./cmd/rlm \
+  --model gemma4:31b-cloud \
+  --context dataset/fifa_world_cup_2026_player_performance.csv \
+  --prompt "Load the dataset and calculate the average player age."
+```
+
+*Note: If a CSV file is supplied, it is pre-loaded into the Python environment as a pandas DataFrame named `df`.*
+
+### CLI Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model` | `nemotron-3-ultra:cloud` | LLM model name |
+| `--prompt` | `""` | Prompt text (alternative: pipe to stdin) |
+| `--context` | `""` | Path to a file containing context (.txt, .md, or .csv) |
+| `--max-iterations` | `30` | Maximum REPL iterations allowed |
+| `--max-depth` | `2` | Maximum recursion depth |
+| `--ollama-host` | `""` | Ollama base URL |
+
+---
+
+## Library Usage
+
+You can import `rlm-golang` as a library in your Go projects:
 
 ```go
 package main
@@ -36,6 +91,7 @@ func main() {
         rlm.WithModel("llama3.1"),
         rlm.WithMaxIterations(10),
         rlm.WithMaxDepth(2),
+        rlm.WithDockerREPL(),
     )
     if err != nil {
         log.Fatal(err)
@@ -50,130 +106,28 @@ func main() {
 }
 ```
 
-## CLI usage
+---
 
-Run a completion with a prompt flag:
+## Architecture
 
-```bash
-go run ./cmd/rlm --model llama3.1 --prompt "What is 2 + 2?"
-```
+The project is structured into the following layers:
 
-Pipe a prompt from stdin:
+- `cmd/rlm` — Command-line interface.
+- `pkg/rlm` — Stable public API wrapper.
+- `internal/rlm` — Orchestrator coordination loop and LM handler.
+- `internal/client` — Ollama HTTP client backend.
+- `internal/environment` — Docker REPL lifecycle and exec script generation.
+- `internal/prompt` — Prompt engineering and system/user prompt builders.
+- `internal/server` — Host-side gRPC services (`LMService`, `RLMService`) to receive requests from the sandbox.
+- `internal/logger` — Custom ANSI colored structured logger.
+- `container` — Sandbox Dockerfile and Python execution script.
 
-```bash
-echo "Summarize the Go runtime" | go run ./cmd/rlm --model llama3.1
-```
-
-Use a remote Ollama host:
-
-```bash
-go run ./cmd/rlm \
-  --model qwen2.5 \
-  --ollama-host http://localhost:11434/api \
-  --prompt "Explain recursion"
-```
-
-### CLI flags
-
-| Flag | Default | Description |
-|---|---|---|
-| `--model` | `llama3.1` | Ollama model name |
-| `--prompt` | "" | Prompt text (or pipe to stdin) |
-| `--max-iterations` | `30` | Maximum REPL iterations |
-| `--max-depth` | `2` | Maximum recursion depth |
-| `--ollama-host` | "" | Ollama base URL |
-
-## HTTP Server
-
-Run the RLM runtime as an HTTP service:
-
-```bash
-go run ./cmd/rlm-server
-```
-
-Configuration via environment variables:
-
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `8080` | Server port |
-| `LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
-| `OLLAMA_HOST` | "" | Default Ollama base URL |
-
-### Endpoints
-
-`GET /health` — health check.
-
-```bash
-curl http://localhost:8080/health
-```
-
-`POST /api/v1/complete` — run a completion. Accepts `multipart/form-data` with the following fields:
-
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `prompt` | yes | — | The question or task |
-| `context` | no | — | A `.txt` file to load as REPL context |
-| `model` | no | `llama3.1` | Ollama model name |
-| `max_iterations` | no | `30` | Maximum REPL iterations |
-| `max_depth` | no | `2` | Maximum recursion depth |
-| `ollama_host` | no | `OLLAMA_HOST` env | Ollama base URL |
-
-Example request with a context file:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/complete \
-  --form 'prompt="Summarize the attached context"' \
-  --form 'context=@context.txt' \
-  --form 'model=llama3.1' \
-  --form 'max_iterations=30' \
-  --form 'max_depth=2'
-```
-
-Example response:
-
-```json
-{
-  "response": "The final answer produced by the model",
-  "root_model": "llama3.1",
-  "execution_time_ms": 12345,
-  "iterations": 2,
-  "usage": {
-    "model_usage_summaries": {
-      "llama3.1": {
-        "total_calls": 3,
-        "total_input_tokens": 150,
-        "total_output_tokens": 80
-      }
-    }
-  }
-}
-```
-
-The response includes the model's final answer, the model that produced it, the
-execution time in milliseconds, the number of iterations, and per-model usage
-metrics (total calls, input tokens, and output tokens).
+---
 
 ## Testing
+
+Run all unit tests:
 
 ```bash
 go test -race ./...
 ```
-
-Docker-dependent integration tests are skipped unless `-short` is omitted and a
-Docker daemon is available.
-
-## Architecture
-
-The runtime is split across these layers:
-
-- `cmd/rlm` — command-line interface
-- `cmd/rlm-server` — HTTP server built on Fiber
-- `pkg/rlm` — public API wrapper
-- `internal/rlm` — orchestrator and LM handler
-- `internal/client` — LM backends (Ollama)
-- `internal/environment` — Docker Python REPL
-- `internal/prompt` — system/user prompt builders
-- `internal/server` — gRPC services for container ↔ host communication
-
-Container-side code calls the host over gRPC (`LMService`, `RLMService`), while
-the host drives the container via `docker exec` and parses JSON from stdout.

@@ -21,7 +21,7 @@ RUN python -m grpc_tools.protoc \
 # Final stage: slim Python 3.11 runtime with dill and grpcio pre-installed.
 FROM python:3.11-slim
 
-RUN pip install --no-cache-dir dill grpcio protobuf
+RUN pip install --no-cache-dir dill grpcio protobuf pandas numpy
 
 COPY --from=builder /out/rlm /usr/local/lib/python3.11/site-packages/rlm
 COPY container/exec_script.py /usr/local/bin/rlm_exec_script.py

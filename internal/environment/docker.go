@@ -143,7 +143,7 @@ func (r *DockerREPL) Setup(ctx context.Context) error {
 		r.workspace = ws
 	}
 
-	slog.Info("DockerREPL starting container", "image", r.image, "workspace", r.workspace, "depth", r.depth)
+	slog.Debug("DockerREPL starting container", "image", r.image, "workspace", r.workspace, "depth", r.depth)
 	stdout, stderr, err := r.runner.Run(
 		ctx,
 		"docker",
@@ -161,7 +161,7 @@ func (r *DockerREPL) Setup(ctx context.Context) error {
 	}
 
 	r.containerID = strings.TrimSpace(string(stdout))
-	slog.Info("DockerREPL container started", "container_id", r.containerID, "workspace", r.workspace, "depth", r.depth)
+	slog.Debug("DockerREPL container started", "container_id", r.containerID, "workspace", r.workspace, "depth", r.depth)
 	return nil
 }
 
@@ -176,10 +176,22 @@ func (r *DockerREPL) LoadContext(ctx context.Context, payload any) error {
 
 	switch v := payload.(type) {
 	case string:
-		slog.Info("DockerREPL loading string context", "container_id", r.containerID, "path", filepath.Join(r.workspace, "context.txt"), "size", len(v))
+		slog.Debug("DockerREPL loading string context", "container_id", r.containerID, "path", filepath.Join(r.workspace, "context.txt"), "size", len(v))
 		if err := os.WriteFile(filepath.Join(r.workspace, "context.txt"), []byte(v), 0o644); err != nil {
 			slog.Error("DockerREPL failed to write context.txt", "container_id", r.containerID, "error", err)
 			return fmt.Errorf("write context.txt: %w", err)
+		}
+		
+		// If payload looks like a CSV, also write context.csv
+		if strings.Contains(v, "\n") {
+			firstLine := strings.SplitN(v, "\n", 2)[0]
+			if strings.Contains(firstLine, ",") || strings.Contains(firstLine, ";") || strings.Contains(firstLine, "\t") {
+				slog.Debug("DockerREPL loading CSV context", "container_id", r.containerID, "path", filepath.Join(r.workspace, "context.csv"), "size", len(v))
+				if err := os.WriteFile(filepath.Join(r.workspace, "context.csv"), []byte(v), 0o644); err != nil {
+					slog.Error("DockerREPL failed to write context.csv", "container_id", r.containerID, "error", err)
+					return fmt.Errorf("write context.csv: %w", err)
+				}
+			}
 		}
 	default:
 		data, err := json.Marshal(v)
@@ -187,7 +199,7 @@ func (r *DockerREPL) LoadContext(ctx context.Context, payload any) error {
 			slog.Error("DockerREPL failed to marshal context", "container_id", r.containerID, "error", err)
 			return fmt.Errorf("marshal context: %w", err)
 		}
-		slog.Info("DockerREPL loading JSON context", "container_id", r.containerID, "path", filepath.Join(r.workspace, "context.json"), "size", len(data))
+		slog.Debug("DockerREPL loading JSON context", "container_id", r.containerID, "path", filepath.Join(r.workspace, "context.json"), "size", len(data))
 		if err := os.WriteFile(filepath.Join(r.workspace, "context.json"), data, 0o644); err != nil {
 			slog.Error("DockerREPL failed to write context.json", "container_id", r.containerID, "error", err)
 			return fmt.Errorf("write context.json: %w", err)
@@ -207,7 +219,7 @@ func (r *DockerREPL) ExecuteCode(ctx context.Context, code string) (rlm.REPLResu
 		return result, errors.New("container not running")
 	}
 
-	slog.Info("DockerREPL executing code", "container_id", r.containerID, "code_len", len(code), "depth", r.depth)
+	slog.Debug("DockerREPL executing code", "container_id", r.containerID, "code_len", len(code), "depth", r.depth)
 	slog.Debug("DockerREPL executing code", "container_id", r.containerID, "code", truncateString(code, 200))
 
 	script := BuildExecScript(ExecConfig{
@@ -234,7 +246,7 @@ func (r *DockerREPL) ExecuteCode(ctx context.Context, code string) (rlm.REPLResu
 		return result, fmt.Errorf("docker exec: %w", err)
 	}
 
-	slog.Info("DockerREPL docker exec completed", "container_id", r.containerID, "stdout_len", len(stdout), "stderr_len", len(stderr), "execution_time", result.ExecutionTime)
+	slog.Debug("DockerREPL docker exec completed", "container_id", r.containerID, "stdout_len", len(stdout), "stderr_len", len(stderr), "execution_time", result.ExecutionTime)
 	return r.parseExecOutput(stdout, stderr, result.ExecutionTime)
 }
 
@@ -328,13 +340,13 @@ func (r *DockerREPL) Cleanup(ctx context.Context) error {
 	var errs []error
 
 	if r.containerID != "" {
-		slog.Info("DockerREPL stopping container", "container_id", r.containerID)
+		slog.Debug("DockerREPL stopping container", "container_id", r.containerID)
 		_, _, _ = r.runner.Run(ctx, "docker", "stop", r.containerID)
 		r.containerID = ""
 	}
 
 	if r.workspace != "" {
-		slog.Info("DockerREPL removing workspace", "workspace", r.workspace)
+		slog.Debug("DockerREPL removing workspace", "workspace", r.workspace)
 		if err := os.RemoveAll(r.workspace); err != nil {
 			slog.Error("DockerREPL failed to remove workspace", "workspace", r.workspace, "error", err)
 			errs = append(errs, fmt.Errorf("remove workspace: %w", err))

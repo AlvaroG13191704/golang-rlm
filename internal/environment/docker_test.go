@@ -123,6 +123,33 @@ func TestDockerREPLLoadContextWritesString(t *testing.T) {
 	}
 }
 
+func TestDockerREPLLoadContextWritesCSV(t *testing.T) {
+	runner := &fakeRunner{}
+	repl := newTestREPL(t, runner)
+
+	csvData := "name,age,city\nJohn,30,New York\nJane,25,Los Angeles"
+	if err := repl.LoadContext(context.Background(), csvData); err != nil {
+		t.Fatalf("LoadContext: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(repl.Workspace(), "context.csv"))
+	if err != nil {
+		t.Fatalf("reading context.csv: %v", err)
+	}
+	if string(data) != csvData {
+		t.Errorf("context.csv = %q, want %q", string(data), csvData)
+	}
+
+	// Make sure context.txt is also written
+	txtData, err := os.ReadFile(filepath.Join(repl.Workspace(), "context.txt"))
+	if err != nil {
+		t.Fatalf("reading context.txt: %v", err)
+	}
+	if string(txtData) != csvData {
+		t.Errorf("context.txt = %q, want %q", string(txtData), csvData)
+	}
+}
+
 func TestDockerREPLLoadContextWritesJSON(t *testing.T) {
 	runner := &fakeRunner{}
 	repl := newTestREPL(t, runner)

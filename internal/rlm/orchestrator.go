@@ -171,7 +171,7 @@ func (r *RLM) Subcall(ctx context.Context, subcallPrompt any, model string, dept
 	resolvedModel := r.resolveModel(model)
 
 	slog.Info("RLM Subcall received", "child_depth", childDepth, "max_depth", r.MaxDepth, "model", resolvedModel)
-	slog.Debug("RLM Subcall prompt", "prompt", subcallPrompt)
+	slog.Debug("RLM Subcall prompt", "prompt", truncateString(subcallPrompt.(string), 200))
 
 	// At or past the recursion cap, fall back to a plain LM completion.
 	if childDepth >= r.MaxDepth {
@@ -217,7 +217,7 @@ func (r *RLM) Subcall(ctx context.Context, subcallPrompt any, model string, dept
 	}
 
 	subcallStart := time.Now()
-	slog.Info("RLM Subcall spawning child", "child_depth", childDepth, "model", resolvedModel)
+	slog.Debug("RLM Subcall spawning child", "child_depth", childDepth, "model", resolvedModel)
 	result, err := child.Completion(ctx, subcallPrompt, "")
 	if result != nil && result.UsageSummary.TotalCost() != nil {
 		r.mu.Lock()
@@ -353,7 +353,12 @@ func (r *RLM) completionTurn(ctx context.Context, messageHistory []prompt.Messag
 	for _, code := range codeBlockStrs {
 		result, err := env.ExecuteCode(ctx, code)
 		if err != nil {
+			slog.Warn("DockerREPL execution failed", "error", err, "stderr", result.Stderr)
 			result.Stderr = result.Stderr + "\n" + err.Error()
+		} else if strings.TrimSpace(result.Stderr) != "" {
+			if strings.Contains(result.Stderr, "Traceback") || strings.Contains(result.Stderr, "Error") || strings.Contains(result.Stderr, "Exception") {
+				slog.Warn("DockerREPL execution finished with error", "stderr", result.Stderr)
+			}
 		}
 		codeBlocks = append(codeBlocks, CodeBlock{Code: code, Result: result})
 	}

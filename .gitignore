@@ -2,5 +2,5 @@
 .atl/
 .agents
 .env
-context.txt
+dataset
 *__pycache__

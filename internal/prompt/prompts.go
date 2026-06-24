@@ -32,6 +32,7 @@ You can iteratively interact with the a Python REPL, which has access to LLM cal
 
 To use the REPL, you need to write code in ` + "```repl```" + ` blocks; the REPL persists across turns. Available in the REPL:
 - ` + "`context`" + `: the important, potentially very long information related to the prompt (typically ` + "`str`" + ` or ` + "`list[str]`" + `).
+- ` + "`df`" + `: if the context is a CSV/TSV file, it is automatically loaded as a pandas DataFrame (pandas is imported as ` + "`pd`" + `, numpy as ` + "`np`" + `).
 - ` + "`llm_query(prompt: str, model: str | None = None) -> str`" + `: a single sub-LLM completion. Use for extraction, summarization, or Q&A over a chunk of text. Sub-LLM context window ≈ 500K chars.
 - ` + "`llm_query_batched(prompts: list[str], model=None) -> list[str]`" + `: concurrently call several LLM calls in parallel over a list of prompts; same order out as in.
 - ` + "`rlm_query(prompt, model=None)`" + ` / ` + "`rlm_query_batched(prompts, model=None)`" + `: recursive RLM sub-calls. Fall back to ` + "`llm_query`" + ` / ` + "`llm_query_batched`" + ` when recursion is disabled.

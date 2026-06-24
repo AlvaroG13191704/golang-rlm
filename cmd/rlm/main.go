@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"rlm-golang/internal/logger"
 	"rlm-golang/pkg/rlm"
 )
 
@@ -46,7 +47,7 @@ func initLogger() {
 		slog.Warn("unknown LOG_LEVEL, defaulting to info", "LOG_LEVEL", os.Getenv("LOG_LEVEL"))
 	}
 
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	handler := logger.NewColorHandler(os.Stderr, slog.HandlerOptions{Level: level})
 	slog.SetDefault(slog.New(handler))
 }
 
@@ -115,5 +116,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	}
 
 	fmt.Fprintln(stdout, result.Response)
+
+	var totalCalls, totalInput, totalOutput int
+	for _, m := range result.UsageSummary.ModelUsageSummaries {
+		totalCalls += m.TotalCalls
+		totalInput += m.TotalInputTokens
+		totalOutput += m.TotalOutputTokens
+	}
+
+	fmt.Fprintln(stdout, "---")
+	fmt.Fprintln(stdout, "Token Usage:")
+	fmt.Fprintf(stdout, "  Total Calls:         %d\n", totalCalls)
+	fmt.Fprintf(stdout, "  Total Input Tokens:  %d\n", totalInput)
+	fmt.Fprintf(stdout, "  Total Output Tokens: %d\n", totalOutput)
+	fmt.Fprintf(stdout, "  Total Tokens:        %d\n", totalInput+totalOutput)
 	return nil
 }

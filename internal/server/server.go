@@ -136,8 +136,9 @@ func (s *Server) RegisterAndStart(lis net.Listener) error {
 	}
 	s.listener = lis
 
+	srv := s.server
 	go func() {
-		if err := s.server.Serve(lis); err != nil {
+		if err := srv.Serve(lis); err != nil {
 			// Server stopped intentionally via Stop; ignore.
 		}
 	}()
@@ -154,7 +155,7 @@ func unaryLoggingInterceptor(ctx context.Context, req any, info *grpc.UnaryServe
 	if batchSize > 0 {
 		attrs = append(attrs, slog.Int("batch_size", batchSize))
 	}
-	slog.Info("gRPC request started", attrs...)
+	slog.Debug("gRPC request started", attrs...)
 
 	resp, err := handler(ctx, req)
 
@@ -163,10 +164,24 @@ func unaryLoggingInterceptor(ctx context.Context, req any, info *grpc.UnaryServe
 		return resp, err
 	}
 
-	respErr, inputTokens, outputTokens := responseSummary(resp)
+	resolvedModel, respErr, inputTokens, outputTokens := responseSummary(resp)
+	logModel := model
+	if resolvedModel != "" {
+		logModel = resolvedModel
+	}
+
+	callType := "unknown"
+	switch info.FullMethod {
+	case "/rlm.v1.LMService/Complete", "/rlm.v1.LMService/CompleteBatched":
+		callType = "llm_query"
+	case "/rlm.v1.RLMService/Subcall", "/rlm.v1.RLMService/SubcallBatched":
+		callType = "rlm_query"
+	}
+
 	logAttrs := []any{
+		slog.String("call_type", callType),
 		slog.String("method", info.FullMethod),
-		slog.String("model", model),
+		slog.String("model", logModel),
 	}
 	if respErr != "" {
 		logAttrs = append(logAttrs, slog.String("response_error", respErr))
@@ -211,7 +226,7 @@ func requestSummary(req any) (model string, promptLen int, batchSize int) {
 	}
 }
 
-func responseSummary(resp any) (respErr string, inputTokens, outputTokens int) {
+func responseSummary(resp any) (model string, respErr string, inputTokens, outputTokens int) {
 	inputTokens = -1
 	outputTokens = -1
 	switch r := resp.(type) {
@@ -220,17 +235,21 @@ func responseSummary(resp any) (respErr string, inputTokens, outputTokens int) {
 			inputTokens = int(r.GetUsage().GetTotalInputTokens())
 			outputTokens = int(r.GetUsage().GetTotalOutputTokens())
 		}
-		return r.GetError(), inputTokens, outputTokens
+		return r.GetRootModel(), r.GetError(), inputTokens, outputTokens
 	case *rlmv1.SubcallResponse:
 		if r.GetUsage() != nil {
 			inputTokens = int(r.GetUsage().GetTotalInputTokens())
 			outputTokens = int(r.GetUsage().GetTotalOutputTokens())
 		}
-		return r.GetError(), inputTokens, outputTokens
+		return r.GetRootModel(), r.GetError(), inputTokens, outputTokens
 	case *rlmv1.BatchedResponse:
 		var inToks, outToks int
 		hasUsage := false
+		resolvedModel := ""
 		for _, item := range r.GetResponses() {
+			if resolvedModel == "" && item.GetRootModel() != "" {
+				resolvedModel = item.GetRootModel()
+			}
 			if item.GetUsage() != nil {
 				hasUsage = true
 				inToks += int(item.GetUsage().GetTotalInputTokens())
@@ -238,13 +257,17 @@ func responseSummary(resp any) (respErr string, inputTokens, outputTokens int) {
 			}
 		}
 		if hasUsage {
-			return "", inToks, outToks
+			return resolvedModel, "", inToks, outToks
 		}
-		return "", -1, -1
+		return resolvedModel, "", -1, -1
 	case *rlmv1.BatchedSubcallResponse:
 		var inToks, outToks int
 		hasUsage := false
+		resolvedModel := ""
 		for _, item := range r.GetResponses() {
+			if resolvedModel == "" && item.GetRootModel() != "" {
+				resolvedModel = item.GetRootModel()
+			}
 			if item.GetUsage() != nil {
 				hasUsage = true
 				inToks += int(item.GetUsage().GetTotalInputTokens())
@@ -252,11 +275,11 @@ func responseSummary(resp any) (respErr string, inputTokens, outputTokens int) {
 			}
 		}
 		if hasUsage {
-			return "", inToks, outToks
+			return resolvedModel, "", inToks, outToks
 		}
-		return "", -1, -1
+		return resolvedModel, "", -1, -1
 	default:
-		return "", inputTokens, outputTokens
+		return "", "", inputTokens, outputTokens
 	}
 }
 

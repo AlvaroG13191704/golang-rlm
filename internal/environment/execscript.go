@@ -48,6 +48,7 @@ from rlm.v1 import lm_service_pb2 as lm_pb2
 from rlm.v1 import lm_service_pb2_grpc as lm_grpc
 from rlm.v1 import rlm_service_pb2 as rlm_pb2
 from rlm.v1 import rlm_service_pb2_grpc as rlm_grpc
+from rlm.v1 import types_pb2
 
 HOST = "host.docker.internal"
 PORT = __LM_PORT__
@@ -87,8 +88,8 @@ def _duration_to_seconds(d):
 
 def _encode_prompt(prompt):
     if isinstance(prompt, str):
-        return prompt, lm_pb2.PromptType.PROMPT_RAW
-    return json.dumps(prompt), lm_pb2.PromptType.PROMPT_JSON
+        return prompt, types_pb2.PromptType.PROMPT_RAW
+    return json.dumps(prompt), types_pb2.PromptType.PROMPT_JSON
 
 def _record_call(prompt, response, root_model, error, usage, execution_time):
     _llm_calls.append({
@@ -117,7 +118,7 @@ def _decode_text(data):
 def llm_query(prompt, model=None):
     logger.info("llm_query called model=%s %s", model or "", _prompt_summary(prompt))
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("llm_query prompt: %s", prompt)
+        logger.debug("llm_query prompt: %s", str(prompt)[:200] + "..." if len(str(prompt)) > 200 else prompt)
     try:
         p, pt = _encode_prompt(prompt)
         req = lm_pb2.CompleteRequest(prompt=p, prompt_type=pt, model=model or "", depth=DEPTH)
@@ -153,7 +154,7 @@ def llm_query_batched(prompts, model=None):
 def rlm_query(prompt, model=None):
     logger.info("rlm_query called depth=%s max_depth=%s model=%s %s", DEPTH, MAX_DEPTH, model or "", _prompt_summary(prompt))
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("rlm_query prompt: %s", prompt)
+        logger.debug("rlm_query prompt: %s", str(prompt)[:200] + "..." if len(str(prompt)) > 200 else prompt)
     if DEPTH >= MAX_DEPTH:
         logger.info("rlm_query falling back to llm_query at max depth")
         return llm_query(prompt, model)
@@ -228,6 +229,15 @@ elif os.path.exists("/workspace/context.json"):
     logger.info("loading JSON context from /workspace/context.json")
     with open("/workspace/context.json", "r") as f:
         _locals["context"] = json.load(f)
+
+if os.path.exists("/workspace/context.csv"):
+    logger.info("loading CSV context from /workspace/context.csv")
+    try:
+        import pandas as pd
+        _locals["df"] = pd.read_csv("/workspace/context.csv")
+        logger.info("loaded CSV context as DataFrame 'df' with shape %s", _locals["df"].shape)
+    except Exception as e:
+        logger.warning("failed to load CSV as DataFrame: %s", e)
 
 def SHOW_VARS():
     available = {k: type(v).__name__ for k, v in _locals.items() if not k.startswith("_") and k != "answer"}
