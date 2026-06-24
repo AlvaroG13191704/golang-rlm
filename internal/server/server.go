@@ -155,6 +155,16 @@ func unaryLoggingInterceptor(ctx context.Context, req any, info *grpc.UnaryServe
 	if batchSize > 0 {
 		attrs = append(attrs, slog.Int("batch_size", batchSize))
 	}
+	previews := requestPreviews(req)
+	if len(previews) > 0 {
+		if len(previews) == 1 {
+			attrs = append(attrs, slog.String("prompt_preview", previews[0]))
+		} else {
+			for i, prev := range previews {
+				attrs = append(attrs, slog.String(fmt.Sprintf("prompt_preview_%d", i), prev))
+			}
+		}
+	}
 	slog.Debug("gRPC request started", attrs...)
 
 	resp, err := handler(ctx, req)
@@ -195,6 +205,46 @@ func unaryLoggingInterceptor(ctx context.Context, req any, info *grpc.UnaryServe
 	slog.Info("gRPC request completed", logAttrs...)
 
 	return resp, nil
+}
+
+func requestPreviews(req any) []string {
+	var prompts []string
+	switch r := req.(type) {
+	case *rlmv1.CompleteRequest:
+		prompts = []string{r.GetPrompt()}
+	case *rlmv1.SubcallRequest:
+		prompts = []string{r.GetPrompt()}
+	case *rlmv1.BatchedRequest:
+		for _, item := range r.GetItems() {
+			prompts = append(prompts, item.GetPrompt())
+		}
+	case *rlmv1.BatchedSubcallRequest:
+		for _, item := range r.GetItems() {
+			prompts = append(prompts, item.GetPrompt())
+		}
+	}
+
+	var previews []string
+	for _, p := range prompts {
+		runes := []rune(p)
+		if len(runes) > 150 {
+			runes = runes[:150]
+			previews = append(previews, cleanString(string(runes))+"...")
+		} else {
+			previews = append(previews, cleanString(string(runes)))
+		}
+	}
+	return previews
+}
+
+func cleanString(s string) string {
+	runes := []rune(s)
+	for i, r := range runes {
+		if r == '\n' || r == '\r' || r == '\t' {
+			runes[i] = ' '
+		}
+	}
+	return string(runes)
 }
 
 func requestSummary(req any) (model string, promptLen int, batchSize int) {

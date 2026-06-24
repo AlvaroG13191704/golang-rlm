@@ -237,10 +237,16 @@ func (r *DockerREPL) ExecuteCode(ctx context.Context, code string) (rlm.REPLResu
 		WorkspaceID:   r.workspaceID,
 	})
 
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+
 	stdout, stderr, err := r.runner.Run(
 		ctx,
 		"docker",
 		"exec",
+		"-e", "LOG_LEVEL="+logLevel,
 		r.containerID,
 		"python", "-c", script,
 	)
