@@ -9,7 +9,7 @@ import (
 	"rlm-golang/internal/prompt"
 )
 
-const defaultMaxIterationChars = 20000
+const defaultMaxIterationChars = 2000
 
 // CodeBlock pairs model-emitted code with its execution result.
 type CodeBlock struct {
@@ -57,10 +57,7 @@ func FormatIteration(iter RLMIteration, maxChars int) []prompt.Message {
 	parts := make([]string, 0, len(iter.CodeBlocks))
 	multi := len(iter.CodeBlocks) > 1
 	for i, block := range iter.CodeBlocks {
-		result := formatExecutionResult(block.Result)
-		if len(result) > maxChars {
-			result = result[:maxChars] + fmt.Sprintf("... + [%d chars...]", len(result)-maxChars)
-		}
+		result := formatExecutionResult(block.Result, maxChars)
 		header := "REPL output:"
 		if multi {
 			header = fmt.Sprintf("REPL output (block %d):", i+1)
@@ -75,10 +72,16 @@ func FormatIteration(iter RLMIteration, maxChars int) []prompt.Message {
 	return messages
 }
 
-func formatExecutionResult(result REPLResult) string {
+func formatExecutionResult(result REPLResult, maxChars int) string {
 	var parts []string
 	if strings.TrimSpace(result.Stdout) != "" {
-		parts = append(parts, result.Stdout)
+		if len(result.Stdout) > maxChars {
+			preview := result.Stdout[:maxChars]
+			warning := fmt.Sprintf("\n\n... [Output truncated. Total length: %d chars. The output is too large to fit in the prompt history. Please store this data in a REPL variable and use 'llm_query' or 'rlm_query' to analyze it programmatically instead of printing it.]", len(result.Stdout))
+			parts = append(parts, preview+warning)
+		} else {
+			parts = append(parts, result.Stdout)
+		}
 	}
 	if strings.TrimSpace(result.Stderr) != "" {
 		parts = append(parts, result.Stderr)

@@ -86,12 +86,10 @@ func TestFormatIterationTruncatesLongOutput(t *testing.T) {
 		},
 	}
 	msgs := rlm.FormatIteration(iter, 20)
-	if !strings.Contains(msgs[1].Content, "...") {
+	if !strings.Contains(msgs[1].Content, "Output truncated") {
 		t.Errorf("long output was not truncated: %q", msgs[1].Content)
 	}
-	if len(msgs[1].Content) < len(long) {
-		// expected
-	} else {
-		t.Errorf("user content length = %d, expected shorter than %d", len(msgs[1].Content), len(long))
+	if strings.Count(msgs[1].Content, "a") > 50 {
+		t.Errorf("too many 'a' characters preserved: %q", msgs[1].Content)
 	}
 }

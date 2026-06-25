@@ -60,8 +60,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	model := fs.String("model", "nemotron-3-ultra:cloud", "Ollama model name")
 	promptFlag := fs.String("prompt", "", "Prompt text (alternative: pipe to stdin)")
 	contextFlag := fs.String("context", "", "Path to a file containing context text")
-	maxIterations := fs.Int("max-iterations", 30, "Maximum REPL iterations")
-	maxDepth := fs.Int("max-depth", 2, "Maximum recursion depth")
+	maxIterations := fs.Int("max-iterations", 50, "Maximum REPL iterations")
+	maxDepth := fs.Int("max-depth", 5, "Maximum recursion depth")
 	maxErrors := fs.Int("max-errors", 3, "Maximum consecutive execution errors before aborting (0 to disable)")
 	ollamaHost := fs.String("ollama-host", "", "Ollama host URL")
 
@@ -142,4 +142,3 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, factory func(
 	fmt.Fprintf(stdout, "  Total Tokens:        %d\n", totalInput+totalOutput)
 	return nil
 }
-

@@ -122,7 +122,7 @@ def llm_query(prompt, model=None):
     try:
         p, pt = _encode_prompt(prompt)
         req = lm_pb2.CompleteRequest(prompt=p, prompt_type=pt, model=model or "", depth=DEPTH)
-        resp = _lm_stub.Complete(req, timeout=300)
+        resp = _lm_stub.Complete(req, timeout=600)
         _record_call(prompt, resp.content, resp.root_model, resp.error, resp.usage, resp.execution_time)
         if resp.error:
             logger.error("llm_query error: %s", resp.error)
@@ -140,7 +140,7 @@ def llm_query_batched(prompts, model=None):
         for p in prompts:
             raw, pt = _encode_prompt(p)
             items.append(lm_pb2.CompleteRequest(prompt=raw, prompt_type=pt, model=model or "", depth=DEPTH))
-        resp = _lm_stub.CompleteBatched(lm_pb2.BatchedRequest(items=items), timeout=300)
+        resp = _lm_stub.CompleteBatched(lm_pb2.BatchedRequest(items=items), timeout=600)
         results = []
         for i, r in enumerate(resp.responses):
             _record_call(prompts[i], r.content, r.root_model, r.error, r.usage, r.execution_time)
@@ -161,7 +161,7 @@ def rlm_query(prompt, model=None):
     try:
         p, pt = _encode_prompt(prompt)
         req = rlm_pb2.SubcallRequest(prompt=p, prompt_type=pt, model=model or "", depth=DEPTH)
-        resp = _rlm_stub.Subcall(req, timeout=300)
+        resp = _rlm_stub.Subcall(req, timeout=600)
         _record_call(prompt, resp.content, resp.root_model, resp.error, resp.usage, resp.execution_time)
         if resp.error:
             logger.error("rlm_query error: %s", resp.error)
@@ -182,7 +182,7 @@ def rlm_query_batched(prompts, model=None):
         for p in prompts:
             raw, pt = _encode_prompt(p)
             items.append(rlm_pb2.SubcallRequest(prompt=raw, prompt_type=pt, model=model or "", depth=DEPTH))
-        resp = _rlm_stub.SubcallBatched(rlm_pb2.BatchedSubcallRequest(items=items), timeout=300)
+        resp = _rlm_stub.SubcallBatched(rlm_pb2.BatchedSubcallRequest(items=items), timeout=600)
         results = []
         for i, r in enumerate(resp.responses):
             _record_call(prompts[i], r.content, r.root_model, r.error, r.usage, r.execution_time)

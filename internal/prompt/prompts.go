@@ -50,7 +50,20 @@ REPL outputs over ~20K characters are truncated, so for longer payloads slice ` 
 
 As a general strategy, you should start by probing your context to understand it better (e.g. print a few lines, count them, etc.). Then, use the REPL to build up an answer to the query.
 
-Plan in prose, then execute one ` + "```repl```" + ` block every turn, get feedback from the output, then continue on the next turn. Do not flip ` + "`answer[\"ready\"] = True`" + ` on turn 1 without first inspecting ` + "`context`" + `.`
+An example strategy is to first look at the context and figure out a chunking strategy, then break up the context into chunks, query an LLM per chunk, and save the answers to a buffer. For example:
+` + "```repl\n" + `chunk = context[:10000]
+answer = llm_query(f"What is the magic number in the context? Here is the chunk: {chunk}")
+print(answer)
+` + "```\n\n" + `As another example, suppose you are iterating through a list of sections:
+` + "```repl\n" + `query = "did Gryffindor win?"
+for i, section in enumerate(context):
+    if i == len(context) - 1:
+        buffer = llm_query(f"You are on the last section. Gather from this to answer {query}. Section: {section}")
+        print(f"Based on reading iteratively, the answer is: {buffer}")
+    else:
+        buffer = llm_query(f"You are iteratively looking through sections. Section {i} of {len(context)}. Gather info to answer {query}. Section: {section}")
+        print(f"After section {i}, tracked: {buffer}")
+` + "```\n\n" + `Plan in prose, then execute one ` + "```repl```" + ` block every turn, get feedback from the output, then continue on the next turn. Do not flip ` + "`answer[\"ready\"] = True`" + ` on turn 1 without first inspecting ` + "`context`" + `.`
 
 // ORCHESTRATOR_ADDENDUM is appended to the system prompt when the orchestrator
 // flag is true. It mirrors the Python reference.
@@ -60,7 +73,13 @@ Directly after you probe the ` + "`context`" + ` and understand your task, pause
 
 Your own context window is small. Push every long-context operation that would not fit comfortably in your own working window — reading, summarizing, classifying, verifying, answering sub-questions, even recapping your own progress — into ` + "`llm_query`" + ` / ` + "`llm_query_batched`" + ` calls instead of pulling that text into your own message stream. (Conversely: if a Python keyword / regex search over ` + "`context`" + ` would already pin the answer, or if a single visible passage already contains it, just read it directly — sub-LMs are for when the raw text won't fit or the question needs semantic interpretation.) Long REPL stdout pollutes history the same way raw ` + "`context`" + ` does: if you want a recap, ask ` + "`llm_query`" + ` for a 1–2 sentence summary and ` + "`print`" + ` only that. Aggregate the small results back in the REPL.
 
-Sub-LLMs have no REPL; they only see the prompt and the ` + "`context`" + ` slice you pass them. Hand them clean, focused inputs and ask for terse, structured outputs you can manipulate programmatically.
+Sub-LLMs have no REPL; they only see the prompt and the ` + "`context`" + ` slice you pass them. Hand them clean, focused inputs and explicitly instruct them to be extremely concise. Sub-LLMs tend to regurgitate context if not strictly constrained, which wastes budget and causes timeouts. Ask for terse, structured outputs you can manipulate programmatically.
+
+***Choosing between 'llm_query' and 'rlm_query'***:
+- Use ` + "`llm_query(prompt)`" + ` for straightforward sub-tasks like summarization, extraction, or answering a question about a chunk.
+- Use ` + "`rlm_query(prompt)`" + ` for **complex sub-tasks** that benefit from iterative, multi-step reasoning. This spawns a full RLM_REPL loop (with its own REPL environment, sub-LLM calls, and iterative code execution) to analyze the given context. Use this when a sub-task itself requires chunking, aggregation, or multi-step analysis.
+
+IMPORTANT: Be very careful about using 'llm_query' as it incurs high runtime costs. Always batch as much information as reasonably possible into each call (aim for around 100K-200K characters per call). For example, if you have 1000 lines of information to process, it's much better to split into chunks of 5 and call 'llm_query' on each chunk rather than making 1000 individual calls. Minimize the number of 'llm_query' calls by batching related information together.
 
 Sub-call budget is finite on two independent axes, and ` + "`llm_query_batched`" + ` only parallelizes — it does not relax either. (1) Per-prompt capacity: a single sub-call answers well only when its input stays modestly sized — a useful rough ceiling is ~100K characters per prompt, less when the text is dense. Pack each prompt close to that capacity (a chunk of many items, a whole document) so one call accomplishes a lot of work. (2) Per-batch fan-out: ` + "`llm_query_batched`" + ` concurrency is bounded too — a useful rough ceiling is ~20 prompts per batch. Tiny-prompt mega-batches (hundreds or thousands of single-item prompts) are the anti-pattern; fat-prompt small batches are correct. For many independent units, use several ~20-wide batches of full-capacity prompts in sequence, not one mega-batch of tiny prompts. When the work can be expressed either as a sequential loop of ` + "`llm_query`" + `s or as one comparably-sized batched call, prefer batched — same total work, far fewer turns burned. After Python-side filtering has narrowed the candidate set, batch-extract the survivors rather than reading them by hand. If the raw workload exceeds both budgets at once (e.g. a context far larger than ~20 × 100K chars), don't brute-force it: filter aggressively in Python first to a tractable subset, or stage the task — a cheap coarse pass narrows candidates, then a targeted second pass extracts from the survivors.
 
